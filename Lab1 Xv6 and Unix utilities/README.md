@@ -1,3 +1,4 @@
+
 # Boot xv6
 
 见环境配置
@@ -37,6 +38,7 @@ Write a program that uses UNIX system calls to ''ping-pong'' a byte between two 
 - 管道用法：一般先创建一个管道，然后进程使用fork函数创建子进程，之后父进程关闭管道的读端，子进程关闭管道的写端
 - 调用fork 后，父进程的 fork() 会返回子进程的 PID，子进程的fork返回 0
 - 注意到write系统调用是`ssize_t write(int fd, const void *buf, size_t count);`，因此写入的字节是一个地址，由于我们声明buf是一个char类型，因此需要填入&buf
+- 这里踩了一个坑，把pingpong写成了pingpang导致错误
 
 ![](https://cdn.jsdelivr.net/gh/LaPhilosophie/image/img/20230208224322.png)
 
@@ -84,4 +86,10 @@ int main(int argc,char * argv[])
 }
 
 ```
+
+# primes
+
+Write a concurrent version of prime sieve using pipes. This idea is due to Doug McIlroy, inventor of Unix pipes. The picture halfway down [this page](http://swtch.com/~rsc/thread/) and the surrounding text explain how to do it. Your solution should be in the file `user/primes.c`.
+
+Your goal is to use `pipe` and `fork` to set up the pipeline. The first process feeds the numbers 2 through 35 into the pipeline. For each prime number, you will arrange to create one process that reads from its left neighbor over a pipe and writes to its right neighbor over another pipe. Since xv6 has limited number of file descriptors and processes, the first process can stop at 35.
 

@@ -1,7 +1,15 @@
+官方文档：https://pdos.csail.mit.edu/6.828/2019/labs/util.html
 
 # Boot xv6
 
-见环境配置
+```shell
+$ git clone git://github.com/mit-pdos/xv6-riscv-fall19.git # 拉取仓库
+$ cd xv6-riscv-fall19 
+$ git checkout util # 切换分支
+$ make 
+$ make qemu
+$ make grade # 自动评测
+```
 
 # sleep
 
@@ -30,6 +38,15 @@ int main(int argc,char * argv[])
 }
 ```
 
+> 报错：user/sh.c:58:1: error: infinite recursion detected [-Werror=infinite-recursion]，解决办法：
+>
+> ```c
+> *// Execute cmd.  Never returns.*
+> __attribute__((noreturn))
+> void
+> runcmd(struct cmd **cmd*)
+> ```
+
 # pingpong
 
 Write a program that uses UNIX system calls to ''ping-pong'' a byte between two processes over a pair of pipes, one for each direction. The parent should send a byte to the child; the child should print "<pid>: received ping", where <pid> is its process ID, write the byte on the pipe to the parent, and exit; the parent should read the byte from the child, print "<pid>: received pong", and exit. Your solution should be in the file `user/pingpong.c`.
@@ -39,8 +56,6 @@ Write a program that uses UNIX system calls to ''ping-pong'' a byte between two 
 - 调用fork 后，父进程的 fork() 会返回子进程的 PID，子进程的fork返回 0
 - 注意到write系统调用是`ssize_t write(int fd, const void *buf, size_t count);`，因此写入的字节是一个地址，由于我们声明buf是一个char类型，因此需要填入&buf
 - 这里踩了一个坑，把pingpong写成了pingpang导致错误
-
-![](https://cdn.jsdelivr.net/gh/LaPhilosophie/image/img/20230208224322.png)
 
 ```c
 #include "kernel/types.h"
@@ -87,9 +102,131 @@ int main(int argc,char * argv[])
 
 ```
 
+![](https://cdn.jsdelivr.net/gh/LaPhilosophie/image/img/20230208224322.png)
+
 # primes
 
 Write a concurrent version of prime sieve using pipes. This idea is due to Doug McIlroy, inventor of Unix pipes. The picture halfway down [this page](http://swtch.com/~rsc/thread/) and the surrounding text explain how to do it. Your solution should be in the file `user/primes.c`.
 
 Your goal is to use `pipe` and `fork` to set up the pipeline. The first process feeds the numbers 2 through 35 into the pipeline. For each prime number, you will arrange to create one process that reads from its left neighbor over a pipe and writes to its right neighbor over another pipe. Since xv6 has limited number of file descriptors and processes, the first process can stop at 35.
+
+- 使用pipe和fork来设置管道
+- 由于xv6文件描述符很少，所以需要关闭所有不必要的文件描述符，否则将会导致描述符耗尽
+- 主要的素数进程应该只有在所有的输出都打印出来之后，并且在所有其他的素数进程都退出之后才能退出
+- 关于read的用法：当管道的写端关闭时，read 返回零，这个可以控制while的终止条件
+- 修改Makefile 的 UPROGS
+
+普通的C语言写法：
+
+```c
+void get_primes2(){
+    for(int i=2;i<=n;i++){
+
+        if(!st[i]) primes[cnt++]=i;//把素数存起来
+        for(int j=i;j<=n;j+=i){//不管是合数还是质数，都用来筛掉后面它的倍数
+            st[j]=true;
+        }
+    }
+}
+
+void get_primes1(){
+    for(int i=2;i<=n;i++){
+        if(!st[i]){
+            primes[cnt++]=i;
+            for(int j=i;j<=n;j+=i) st[j]=true;//可以用质数就把所有的合数都筛掉；
+        }
+    }
+}
+```
+
+并发编程的思路不同于以上方式，我们可以给出伪代码：
+
+```c
+p = get a number from left neighbor
+print p
+loop:
+    n = get a number from left neighbor
+    if (p does not divide n)
+        send n to right neighbor
+```
+
+一个生成过程可以将数字2、3、4、 ... ... 35输入管道的左端: 管道中的第一个过程消除了2的倍数，第二个过程消除了3的倍数，第三个过程消除了5的倍数，依此类推
+
+> https://swtch.com/~rsc/thread/
+
+![](https://cdn.jsdelivr.net/gh/LaPhilosophie/image/img/20230227125558.png)
+
+
+
+```c
+#include "kernel/types.h"
+#include "kernel/stat.h"
+#include "user/user.h"
+
+#define READ 0
+#define WRITE 1
+
+void foo(int *left_fd)
+{
+    close(left_fd[WRITE]);
+    int prime,i;
+    read(left_fd[READ],&prime,sizeof(int));//第一个数字必定是素数
+    printf("prime %d\n",prime);//符合格式的输出
+    
+    if(read(left_fd[READ],&i,sizeof(int))!=0)
+    {
+        int right_fd[2];
+        pipe(right_fd);
+        int pid=fork();
+        if(pid==0)
+        {
+            foo(right_fd);
+        }
+        else if(pid>0)
+        {
+            close(right_fd[READ]);
+            if(i%prime!=0)//注意已经读取了一个i，这里要判断一下
+            {
+                write(right_fd[WRITE],&i,sizeof(int));
+            }
+            while(read(left_fd[READ],&i,sizeof(int))!=0)
+            {
+                if(i%prime!=0)
+                {
+                    write(right_fd[WRITE],&i,sizeof(int));
+                }
+            }
+            close(right_fd[WRITE]);
+            close(left_fd[READ]);
+            wait(0);//父进程要等待子进程
+        }
+    }
+}
+
+int main(int argc,char * argv[])
+{
+    int left_fd[2];
+    pipe(left_fd);
+    
+    int pid = fork();
+    
+    if(pid==0)//child
+    {
+        foo(left_fd);
+    } 
+    else if(pid >0)
+    {
+        close(left_fd[READ]);
+        int i;
+        for(i=2;i<=35;i++)//第一轮，把2~35全都传递给右边
+        {
+            write(left_fd[WRITE],&i,sizeof(int));
+        }
+        close(left_fd[WRITE]);
+        wait(0);//主要的素数进程应该只有在所有的输出都打印出来之后，并且在所有其他的素数进程都退出之后才能退出
+    }
+    
+    exit(0);
+}
+```
 

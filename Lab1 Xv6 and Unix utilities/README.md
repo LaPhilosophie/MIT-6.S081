@@ -1,4 +1,4 @@
-官方文档：https://pdos.csail.mit.edu/6.828/2019/labs/util.html
+官方文档：https://pdos.csail.mit.edu/6.828/2020/labs/util.html
 
 # Boot xv6
 
@@ -8,7 +8,8 @@ $ cd xv6-riscv-fall19
 $ git checkout util # 切换分支
 $ make 
 $ make qemu
-$ make grade # 自动评测
+$ make grade # 自动评测所有的程序
+$ ./grade-lab-util sleep # 评测单个程序sleep
 ```
 
 # sleep
@@ -229,4 +230,97 @@ int main(int argc,char * argv[])
     exit(0);
 }
 ```
+
+## find
+
+Write a simple version of the UNIX find program: find all the files in a directory tree whose name matches a string. Your solution should be in the file `user/find.c`.
+
+- 功能：查找目录树中名称与字符串匹配的所有文件
+- 可以参考user/ls.c 以了解如何读取目录
+- 避开`.`和`..`的递归
+
+思路：
+
+打开目录，使用while循环得到目录下所有文件/子目录的dirent结构体de
+
+- 如果是de.name是.或者..，那么直接continue跳过
+- 如果使用字符串拼接获取文件的相对路径buf
+  - 如果buf的st类型是文件类型，且文件名字和我们需要搜索的文件名字相同，那么就直接输出文件信息，这就是我们要找的文件
+  - 如果buf的st类型是目录，那么就继续递归搜索下去
+
+> 涉及到read、fstat等函数的使用
+>
+> 涉及到dirent、stat结构体的使用
+
+```c
+#include "kernel/types.h"
+#include "kernel/stat.h"
+#include "user/user.h"
+#include "kernel/fs.h"
+
+void find(char * path,char *file)
+{
+    int fd;
+    struct dirent de;
+    struct stat st;
+    char buf[512], *p;
+
+    if((fd = open(path, 0)) < 0){//打开目录，获得对应的文件描述符
+        fprintf(2, "find: cannot open %s\n", path);
+        return;
+    }
+
+    if(fstat(fd, &st) < 0){
+        fprintf(2, "find: cannot stat %s\n", path);
+        close(fd);
+        return;
+    }
+    
+    while(read(fd, &de, sizeof(de)) == sizeof(de))//使用while循环得到目录下所有文件/子目录的dirent结构体de
+    {
+        if(strcmp(de.name,".")==0||strcmp(de.name,"..")==0)
+            continue;//跳过
+        
+        strcpy(buf, path);
+        p = buf+strlen(buf);
+        *p++ = '/';
+        char *pp=de.name;
+        while(*pp!=0) //字符串拼接
+        {
+            *p++ =*pp++;
+        }
+        *p=0;//别忘了加终止符
+        
+        if(stat(buf, &st) < 0)//获取buf的st
+        {
+            printf("find: cannot stat %s\n", buf);
+            continue;
+        }
+        if(st.type==T_FILE)//如果buf的st类型是文件类型
+        {
+            if(strcmp(de.name,file)==0)//如果文件名字和我们需要搜索的文件名字相同，那么就直接输出文件信息
+            {
+                printf("%s\n",buf);
+            }
+        }
+        else if(st.type==T_DIR)//如果buf的st类型是目录类型
+        {
+            find(buf,file);//递归，继续搜索
+        }
+
+    }
+}
+
+int main(int argc, char *argv[])
+{
+    char * path=argv[1];//查找目录
+    char * file=argv[2];//查找文件
+
+    find(path,file);
+
+    exit(0);
+}
+```
+
+## xargs
 

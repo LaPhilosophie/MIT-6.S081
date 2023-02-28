@@ -231,7 +231,7 @@ int main(int argc,char * argv[])
 }
 ```
 
-## find
+# find
 
 Write a simple version of the UNIX find program: find all the files in a directory tree whose name matches a string. Your solution should be in the file `user/find.c`.
 
@@ -246,7 +246,7 @@ Write a simple version of the UNIX find program: find all the files in a directo
 - 如果是de.name是.或者..，那么直接continue跳过
 - 如果使用字符串拼接获取文件的相对路径buf
   - 如果buf的st类型是文件类型，且文件名字和我们需要搜索的文件名字相同，那么就直接输出文件信息，这就是我们要找的文件
-  - 如果buf的st类型是目录，那么就继续递归搜索下去
+  - 如果buf的st类型是目录，且不为空，那么就继续递归搜索下去
 
 > 涉及到read、fstat等函数的使用
 >
@@ -305,6 +305,8 @@ void find(char * path,char *file)
         }
         else if(st.type==T_DIR)//如果buf的st类型是目录类型
         {
+            if (de.inum == 0) //目录下没有文件，如果缺少这个语句xargs命令将会报错
+			    continue;
             find(buf,file);//递归，继续搜索
         }
 
@@ -322,5 +324,5 @@ int main(int argc, char *argv[])
 }
 ```
 
-## xargs
+# xargs
 

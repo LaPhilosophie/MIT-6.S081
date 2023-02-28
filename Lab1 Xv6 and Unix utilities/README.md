@@ -326,3 +326,69 @@ int main(int argc, char *argv[])
 
 # xargs
 
+Write a simple version of the UNIX xargs program: read lines from the standard input and run a command for each line, supplying the line as arguments to the command. Your solution should be in the file `user/xargs.c`.
+
+- 对于管道连接的命令，以`find . b | xargs grep hello`为例，argv[0]是 xargs，argv[1]是grep，一共有三个参数，如果想要读取find . b，那么需要从标准输入中读取，也即是使用read函数读取fd为0时的数据
+- 每一次读取一行，将该行所有空格替换为\0，这样命令就可以被分割。然后将argv[]指向这些命令。如果遇到换行符，执行fork，父进程等待子进程结束
+
+```c
+#include "kernel/types.h"
+#include "kernel/stat.h"
+#include "user/user.h"
+#include "kernel/fs.h"
+#include "kernel/param.h"
+
+#define STDIN 0
+
+int main(int argc,char *argv[])
+{
+    char buf[1024];
+    char c;
+    char *Argv[MAXARG];
+    int index=0;
+    int i;
+
+    for(i=1;i<=argc-1;i++)
+    {
+        Argv[i-1]=argv[i];//ignore xargs(argv[0])
+    }
+    
+    while(1)
+    {
+        index=0;
+        memset(buf,0,sizeof(buf));
+        char *p=buf;
+        i=argc-1;//注意i要写在这里
+        while(1)
+        {
+            int num=read(STDIN,&c,1);//读取标准输入,注意是&c
+            if(num!=1)
+                exit(0);//程序的终止条件
+            if(c==' '||c=='\n')
+            {
+                buf[index++]='\0';
+                Argv[i++]=p;//参数
+                p=&buf[index];//更新参数首地址
+                if(c=='\n') 
+                    break;
+            }
+            else //character 
+            {
+                buf[index++]=c;
+            }
+        }
+        Argv[i]=0;
+        int pid = fork();
+        if(pid==0)
+        {
+            exec(Argv[0],Argv);
+        }
+        else
+        {
+            wait(0);
+        }
+    }
+    exit(0);
+}
+```
+

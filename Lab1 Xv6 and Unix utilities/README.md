@@ -42,10 +42,12 @@ int main(int argc,char * argv[])
 > 报错：user/sh.c:58:1: error: infinite recursion detected [-Werror=infinite-recursion]，解决办法：
 >
 > ```c
-> *// Execute cmd.  Never returns.*
-> __attribute__((noreturn))
+> // Execute cmd.  Never returns.*
+> __attribute__((noreturn)) 
 > void
-> runcmd(struct cmd **cmd*)
+> runcmd(struct cmd *cmd) {
+>  	.....
+> }
 > ```
 
 # pingpong
@@ -392,3 +394,6 @@ int main(int argc,char *argv[])
 }
 ```
 
+
+
+![](https://cdn.jsdelivr.net/gh/LaPhilosophie/image/img/20230301002218.png)

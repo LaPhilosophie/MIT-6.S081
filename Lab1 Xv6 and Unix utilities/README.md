@@ -3,8 +3,8 @@
 # Boot xv6
 
 ```shell
-$ git clone git://github.com/mit-pdos/xv6-riscv-fall19.git # 拉取仓库
-$ cd xv6-riscv-fall19 
+$ git clone git clone git://g.csail.mit.edu/xv6-labs-2020 # 拉取仓库
+$ cd xv6-labs-2020
 $ git checkout util # 切换分支
 $ make 
 $ make qemu

@@ -359,4 +359,4 @@ sys_sysinfo(void)
 
 有一些头文件的添加，函数或者结构体的声明、定义的细节，暂且略过
 
-![image-20230305004020691](C:\Users\user\fromGitHub\MIT-6.S081\Lab2 syscall System calls\image\image-20230305004020691.png)
+![](https://cdn.jsdelivr.net/gh/LaPhilosophie/image/img/202303212225098.png)
